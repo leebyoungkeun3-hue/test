@@ -11,17 +11,23 @@ export interface TargetFieldDef {
 
 export const TARGET_FIELDS: TargetFieldDef[] = [
   {
-    key: 'name',
-    label: '이름 (성명)',
-    required: true,
+    key: 'order',
+    label: '교번 (연번/순번)',
+    required: false,
     aliases: [
-      '이름', '성명', '교육생', '교육생명', '성 명', '성 함', '이 름',
-      '성명(이름)', '성명(한글)', '성명(원문)', '직원명', '성함',
-      '피교육자', '이름(성명)', '대상자', '수강생', '이름/성명', '교육생성명',
-      '성 명(이름)', '이름(필수)', '성명(필수)', '교원명', '이름(한글)',
-      'name', 'trainee', 'student',
+      '교번', '번호', '연번', '순번', 'no', 'num', 'number', '순서', 'id', '순', '인덱스',
     ],
-    example: '홍길동',
+    example: '001, 002, 003...',
+  },
+  {
+    key: 'agency',
+    label: '청별 (지방청)',
+    required: false,
+    aliases: [
+      '청별', '지방청', '소속청', '청', '관할청', '우정청', '지방우정청', '청구분',
+      'agency', 'region',
+    ],
+    example: '경인청, 서울청, 충청청',
   },
   {
     key: 'affiliation',
@@ -45,7 +51,43 @@ export const TARGET_FIELDS: TargetFieldDef[] = [
       '신분', '직종', '직급(직명)', '호봉', '직급구분', '직급명', '임용직',
       'rank', 'position', 'grade',
     ],
-    example: '행정서기보(시보)',
+    example: '우정서기, 우정주사보',
+  },
+  {
+    key: 'name',
+    label: '성명 (이름)',
+    required: true,
+    aliases: [
+      '성명', '이름', '교육생', '교육생명', '성 명', '성 함', '이 름',
+      '성명(이름)', '성명(한글)', '성명(원문)', '직원명', '성함',
+      '피교육자', '이름(성명)', '대상자', '수강생', '이름/성명', '교육생성명',
+      '성 명(이름)', '이름(필수)', '성명(필수)', '교원명', '이름(한글)',
+      'name', 'trainee', 'student',
+    ],
+    example: '홍길동',
+  },
+  {
+    key: 'dorm',
+    label: '숙소 (생활관/호실)',
+    required: false,
+    aliases: [
+      '숙소', '생활관', '호실', '기숙사', '방번호', '숙소배정', '호실배정',
+      '생활관호실', '숙소(생활관)', '생활관(호실)', '입소여부', '숙소명',
+      '기숙사호실', '생활관배정', '숙소호실', '합숙여부', '생활실',
+      'dorm', 'room',
+    ],
+    example: '1, 2, 3, 4',
+  },
+  {
+    key: 'team',
+    label: '분임조 (분임/조)',
+    required: false,
+    aliases: [
+      '분임조', '분임', '조', '반', '팀', '조편성', '분임명', '조(분임)',
+      '편성조', '분임(조)', '그룹', '배정조', '조구분', '분임번호',
+      'group', 'team', 'class',
+    ],
+    example: '441, 442, 443',
   },
   {
     key: 'gender',
@@ -58,29 +100,6 @@ export const TARGET_FIELDS: TargetFieldDef[] = [
     example: '남 / 여',
   },
   {
-    key: 'group',
-    label: '조 (분임/팀)',
-    required: false,
-    aliases: [
-      '조', '분임', '반', '팀', '조편성', '분임조', '분임명', '조(분임)',
-      '편성조', '분임(조)', '그룹', '배정조', '조구분', '분임번호',
-      'group', 'team', 'class',
-    ],
-    example: '1조',
-  },
-  {
-    key: 'dorm',
-    label: '숙소 (생활관/호실)',
-    required: false,
-    aliases: [
-      '숙소', '생활관', '호실', '기숙사', '방번호', '숙소배정', '호실배정',
-      '생활관호실', '숙소(생활관)', '생활관(호실)', '입소여부', '숙소명',
-      '기숙사호실', '생활관배정', '숙소호실', '합숙여부', '생활실',
-      'dorm', 'room',
-    ],
-    example: '희망관 201호 / 비생활',
-  },
-  {
     key: 'notes',
     label: '비고 (특이사항)',
     required: false,
@@ -88,16 +107,7 @@ export const TARGET_FIELDS: TargetFieldDef[] = [
       '비고', '특이사항', '메모', '비고사항', '기타', '참고사항', '특기사항',
       '주의사항', '전달사항', '메모사항', 'remarks', 'notes', 'comment',
     ],
-    example: '조장 / 통근',
-  },
-  {
-    key: 'order',
-    label: '번호 (연번/순번)',
-    required: false,
-    aliases: [
-      '번호', '연번', '순번', 'no', 'num', 'number', '순서', 'id', '순', '인덱스',
-    ],
-    example: '1, 2, 3...',
+    example: '반장, 조장',
   },
 ];
 
@@ -392,13 +402,14 @@ export function exportTraineesToExcel(
   cohort: string
 ): void {
   const data = trainees.map((t, index) => ({
-    '번호': t.order || index + 1,
+    '교번': String(t.order || index + 1).padStart(3, '0'),
+    '청별': t.agency || '',
     '소속': t.affiliation,
     '직급': t.rank,
-    '이름': t.name,
-    '성별': t.gender || '',
-    '조': t.group,
+    '성명': t.name,
     '숙소': t.dorm,
+    '분임조': t.team || t.group,
+    '성별': t.gender || '',
     '비고': t.notes || '',
   }));
 
@@ -406,14 +417,15 @@ export function exportTraineesToExcel(
 
   // Set column widths
   worksheet['!cols'] = [
-    { wch: 8 },  // 번호
+    { wch: 8 },  // 교번
+    { wch: 10 }, // 청별
     { wch: 18 }, // 소속
-    { wch: 16 }, // 직급
-    { wch: 12 }, // 이름
+    { wch: 14 }, // 직급
+    { wch: 12 }, // 성명
+    { wch: 8 },  // 숙소
+    { wch: 10 }, // 분임조
     { wch: 8 },  // 성별
-    { wch: 8 },  // 조
-    { wch: 15 }, // 숙소
-    { wch: 20 }, // 비고
+    { wch: 16 }, // 비고
   ];
 
   const workbook = XLSX.utils.book_new();

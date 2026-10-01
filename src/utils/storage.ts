@@ -3,10 +3,10 @@ import { INITIAL_COURSES, INITIAL_TRAINEES, INITIAL_TIMETABLE } from './initialD
 import { getKoreanDayOfWeek, calculateDaysBetween } from './dateUtils';
 
 const KEYS = {
-  COURSES: 'koreapost_training_courses_v5',
-  TRAINEES: 'koreapost_training_trainees_v5',
-  TIMETABLES: 'koreapost_training_timetables_v5',
-  ACTIVE_COURSE_ID: 'koreapost_active_course_id_v5',
+  COURSES: 'koreapost_training_courses_v7',
+  TRAINEES: 'koreapost_training_trainees_v7',
+  TIMETABLES: 'koreapost_training_timetables_v7',
+  ACTIVE_COURSE_ID: 'koreapost_active_course_id_v7',
 };
 
 export function loadCourses(): Course[] {

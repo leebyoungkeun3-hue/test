@@ -147,12 +147,14 @@ export const TraineeManager: React.FC<TraineeManagerProps> = ({
       id: 'tr_' + Math.random().toString(36).substring(2, 9),
       courseId: course.id,
       order: newOrder,
-      affiliation: '서울강남우체국',
-      rank: '행정서기보(시보)',
+      agency: '충청청',
+      affiliation: '대전대덕우체국',
+      rank: '우정서기',
       name: '',
       gender: '남',
       group: '1조',
-      dorm: '희망관',
+      team: '441',
+      dorm: '1',
       notes: '',
     };
     onUpdateTrainees([...trainees, newTrainee]);
@@ -536,7 +538,7 @@ export const TraineeManager: React.FC<TraineeManagerProps> = ({
           <table className="w-full text-xs text-left border-collapse">
             <thead className="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 border-b border-slate-300 select-none">
               <tr>
-                <th className="py-2.5 px-3 w-10 text-center">
+                <th className="py-2.5 px-2 w-10 text-center">
                   <button
                     onClick={handleSelectAllToggle}
                     className="cursor-pointer text-slate-600 hover:text-slate-900"
@@ -549,13 +551,14 @@ export const TraineeManager: React.FC<TraineeManagerProps> = ({
                     )}
                   </button>
                 </th>
-                <th className="py-2.5 px-2 w-14 text-center">번호</th>
-                <th className="py-2.5 px-3 w-36">소속 (근무지/우체국)</th>
-                <th className="py-2.5 px-3 w-32">직급</th>
-                <th className="py-2.5 px-2 w-16 text-center">성별</th>
-                <th className="py-2.5 px-3 w-28">이름 (성명)</th>
-                <th className="py-2.5 px-3 w-20 text-center">조</th>
-                <th className="py-2.5 px-3 w-32">숙소 (생활관)</th>
+                <th className="py-2.5 px-2 w-14 text-center">교번</th>
+                <th className="py-2.5 px-2 w-20">청별</th>
+                <th className="py-2.5 px-3 w-36">소속 (우체국)</th>
+                <th className="py-2.5 px-2 w-28">직급</th>
+                <th className="py-2.5 px-3 w-24">성명</th>
+                <th className="py-2.5 px-2 w-16 text-center">숙소</th>
+                <th className="py-2.5 px-2 w-20 text-center">분임조</th>
+                <th className="py-2.5 px-2 w-14 text-center">성별</th>
                 <th className="py-2.5 px-3">비고</th>
                 <th className="py-2.5 px-2 w-20 text-center">순서/관리</th>
               </tr>
@@ -573,7 +576,7 @@ export const TraineeManager: React.FC<TraineeManagerProps> = ({
                       }`}
                     >
                       {/* Checkbox */}
-                      <td className="py-2 px-3 text-center">
+                      <td className="py-2 px-2 text-center">
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -594,6 +597,17 @@ export const TraineeManager: React.FC<TraineeManagerProps> = ({
                         />
                       </td>
 
+                      {/* Agency (청별) */}
+                      <td className="py-2 px-2">
+                        <input
+                          type="text"
+                          value={trainee.agency || ''}
+                          onChange={(e) => handleCellChange(trainee.id, 'agency', e.target.value)}
+                          placeholder="청별"
+                          className="w-full py-1 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 rounded bg-transparent focus:bg-white focus:outline-none font-medium text-slate-800"
+                        />
+                      </td>
+
                       {/* Affiliation */}
                       <td className="py-2 px-3">
                         <input
@@ -606,26 +620,14 @@ export const TraineeManager: React.FC<TraineeManagerProps> = ({
                       </td>
 
                       {/* Rank */}
-                      <td className="py-2 px-3">
+                      <td className="py-2 px-2">
                         <input
                           type="text"
                           value={trainee.rank}
                           onChange={(e) => handleCellChange(trainee.id, 'rank', e.target.value)}
                           placeholder="직급"
-                          className="w-full py-1 px-1.5 border border-transparent hover:border-slate-300 focus:border-blue-500 rounded bg-transparent focus:bg-white focus:outline-none text-slate-700"
+                          className="w-full py-1 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 rounded bg-transparent focus:bg-white focus:outline-none text-slate-700"
                         />
-                      </td>
-
-                      {/* Gender */}
-                      <td className="py-2 px-1 text-center">
-                        <select
-                          value={trainee.gender || '남'}
-                          onChange={(e) => handleCellChange(trainee.id, 'gender', e.target.value)}
-                          className="text-xs py-1 px-1.5 border border-transparent hover:border-slate-300 focus:border-blue-500 rounded bg-transparent focus:bg-white focus:outline-none font-bold text-slate-800 cursor-pointer"
-                        >
-                          <option value="남">남</option>
-                          <option value="여">여</option>
-                        </select>
                       </td>
 
                       {/* Name */}
@@ -639,26 +641,41 @@ export const TraineeManager: React.FC<TraineeManagerProps> = ({
                         />
                       </td>
 
-                      {/* Group */}
-                      <td className="py-2 px-3 text-center">
-                        <input
-                          type="text"
-                          value={trainee.group}
-                          onChange={(e) => handleCellChange(trainee.id, 'group', e.target.value)}
-                          placeholder="1조"
-                          className="w-16 text-center py-1 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 rounded bg-transparent focus:bg-white focus:outline-none font-semibold text-blue-900"
-                        />
-                      </td>
-
                       {/* Dorm */}
-                      <td className="py-2 px-3">
+                      <td className="py-2 px-2 text-center">
                         <input
                           type="text"
                           value={trainee.dorm}
                           onChange={(e) => handleCellChange(trainee.id, 'dorm', e.target.value)}
-                          placeholder="생활관 / 비생활"
-                          className="w-full py-1 px-1.5 border border-transparent hover:border-slate-300 focus:border-blue-500 rounded bg-transparent focus:bg-white focus:outline-none text-slate-700"
+                          placeholder="숙소"
+                          className="w-12 text-center py-1 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 rounded bg-transparent focus:bg-white focus:outline-none text-slate-700"
                         />
+                      </td>
+
+                      {/* Team / 분임조 */}
+                      <td className="py-2 px-2 text-center">
+                        <input
+                          type="text"
+                          value={trainee.team || trainee.group}
+                          onChange={(e) => {
+                            handleCellChange(trainee.id, 'team', e.target.value);
+                            handleCellChange(trainee.id, 'group', e.target.value);
+                          }}
+                          placeholder="분임조"
+                          className="w-16 text-center py-1 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 rounded bg-transparent focus:bg-white focus:outline-none font-semibold text-blue-900"
+                        />
+                      </td>
+
+                      {/* Gender */}
+                      <td className="py-2 px-1 text-center">
+                        <select
+                          value={trainee.gender || '남'}
+                          onChange={(e) => handleCellChange(trainee.id, 'gender', e.target.value)}
+                          className="text-xs py-1 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 rounded bg-transparent focus:bg-white focus:outline-none font-bold text-slate-700 cursor-pointer"
+                        >
+                          <option value="남">남</option>
+                          <option value="여">여</option>
+                        </select>
                       </td>
 
                       {/* Notes */}

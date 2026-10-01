@@ -22,7 +22,6 @@ interface PrintPreviewProps {
   timetables: TimetableItem[];
 }
 
-// Standard 8 periods + Lunch
 interface PeriodSlot {
   periodNum: number | 'lunch';
   label: string; // e.g. "1교시", "점심시간"
@@ -50,11 +49,8 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
   // Current selected week index (or 'all' for multi-week printing)
   const [selectedWeekIndex, setSelectedWeekIndex] = useState<number | 'all'>(0);
 
-  // Density mode: 'normal' | 'compact' (for large rosters)
-  const [density, setDensity] = useState<'normal' | 'compact'>('normal');
-
-  // Style Mode: 'korea-post' (Korea Post signature red) | 'visual' (Multi-color category) | 'official' (HWP standard monochrome)
-  const [colorMode, setColorMode] = useState<'korea-post' | 'visual' | 'official'>('korea-post');
+  // Style Mode: 'official' (100% Attached Photo Exact Replica) | 'korea-post' (Red Accent) | 'visual' (Color Badges)
+  const [colorMode, setColorMode] = useState<'official' | 'korea-post' | 'visual'>('official');
 
   if (!course) {
     return (
@@ -76,9 +72,24 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
     return timetables.filter((t) => t.courseId === course.id);
   }, [timetables, course.id]);
 
-  // Compute weekly blocks from course dates
+  // Compute weekly blocks from course dates (ensure Monday to Friday standard 5-day week)
   const courseWeeks = useMemo(() => {
-    return getCourseWeeks(course.startDate, course.endDate);
+    // If startDate is Wednesday (e.g. 2026-09-30), compute the Monday of that week
+    const startObj = new Date(course.startDate);
+    const day = startObj.getDay(); // 0 is Sun, 1 is Mon...
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    const mondayObj = new Date(startObj);
+    mondayObj.setDate(startObj.getDate() + diffToMon);
+    const monStr = mondayObj.toISOString().split('T')[0];
+
+    const endObj = new Date(course.endDate);
+    const endDay = endObj.getDay();
+    const diffToFri = endDay === 0 ? -2 : 5 - endDay;
+    const fridayObj = new Date(endObj);
+    fridayObj.setDate(endObj.getDate() + diffToFri);
+    const friStr = fridayObj.toISOString().split('T')[0];
+
+    return getCourseWeeks(monStr, friStr);
   }, [course.startDate, course.endDate]);
 
   // Active week object for single-week view
@@ -93,13 +104,13 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
   const getItemForSlot = (date: string, periodSlot: PeriodSlot): TimetableItem | undefined => {
     if (periodSlot.periodNum === 'lunch') return undefined;
 
-    // First try exact period number match
+    // Exact period match
     const byPeriod = currentTimetables.find(
       (t) => t.date === date && t.period === periodSlot.periodNum
     );
     if (byPeriod) return byPeriod;
 
-    // Second try time matching (e.g. startTime begins with 09: for 1st period)
+    // Time-based match
     const byTime = currentTimetables.find((t) => {
       if (t.date !== date) return false;
       const startH = parseInt(t.startTime.split(':')[0], 10);
@@ -114,54 +125,78 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
     window.print();
   };
 
+  // Total target rows on the right trainee table (26 rows perfectly balances timetable height)
+  const TARGET_TOTAL_TRAINEE_ROWS = 26;
+  const blankRowsNeeded = Math.max(0, TARGET_TOTAL_TRAINEE_ROWS - currentTrainees.length);
+
   // Render a Single Landscape Sheet (Left: Timetable, Right: Trainee List)
   const renderLandscapeSheet = (week: CourseWeek, pageIndex: number, totalPages: number) => {
-    const managerName = course.manager ? course.manager.replace(/\s*\(.*?\)/, '') : '담임교수';
-    const footerDept = '직무역량교육팀';
-    const footerDate = course.startDate === '2026-09-28' ? '2026-09-29' : new Date().toISOString().split('T')[0];
+    const managerName = course.manager ? course.manager.replace(/\s*\(.*?\)/, '') : '이병근';
+    const footerDeptLeft = '직무역량교육팀';
+    const footerDeptRight = '역량교육팀';
+    const footerDate = course.startDate.startsWith('2026-09') ? '2026-09-29' : new Date().toISOString().split('T')[0];
+
+    // Format dates as YYYY.M.D.~YYYY.M.D. matching attached image exactly
+    const [y1, m1, d1] = course.startDate.split('-').map(Number);
+    const [y2, m2, d2] = course.endDate.split('-').map(Number);
+    const dateRangeStr = `${y1}.${m1}.${d1}.~${y2}.${m2}.${d2}.`;
 
     return (
       <div
         key={week.weekNumber}
-        className={`print-avoid-break mx-auto max-w-[297mm] bg-white border border-slate-300 shadow-xl p-[7mm] text-black ${
-          pageIndex > 0 ? 'print-page-break mt-8' : ''
+        className={`print-avoid-break mx-auto max-w-[297mm] bg-white border border-slate-300 shadow-2xl p-[6mm] print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none text-black relative overflow-hidden print:overflow-visible select-none ${
+          pageIndex > 0 ? 'print-page-break mt-8 print:mt-0' : ''
         }`}
         style={{
           fontFamily: '"Pretendard", "Malgun Gothic", "맑은 고딕", -apple-system, sans-serif',
+          minHeight: '190mm',
         }}
       >
-        {/* Main 2-Column Split: Left = Timetable (~62%), Right = Trainees (~38%) */}
-        <div className="flex gap-[3.5mm] items-start">
+        {/* Subtle Official Watermark Background (Matches attached document photo) */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.045] z-0 select-none">
+          <div className="flex flex-col items-center">
+            {/* Korea Post Eagle / Wings Silhouette SVG */}
+            <svg
+              className="w-[280px] h-[160px]"
+              viewBox="0 0 200 110"
+              fill="currentColor"
+            >
+              <path d="M100 15 C60 15 20 45 10 80 C40 65 75 60 100 70 C125 60 160 65 190 80 C180 45 140 15 100 15 Z" />
+              <path d="M100 35 C75 35 45 55 35 85 C60 72 85 70 100 78 C115 70 140 72 165 85 C155 55 125 35 100 35 Z" />
+            </svg>
+            <span className="font-black text-4xl tracking-[0.3em] font-sans mt-1">
+              KOREA POST
+            </span>
+          </div>
+        </div>
+
+        {/* Main 2-Column Split: Left = Timetable (~57%), Right = Trainees (~43%) */}
+        <div className="flex gap-[3.5mm] items-start relative z-10">
           {/* ============================================================== */}
           {/* LEFT COLUMN: WEEKLY TIMETABLE MATRIX (IMAGE EXACT REPLICA)    */}
           {/* ============================================================== */}
-          <div className="w-[62%] flex flex-col justify-between">
+          <div className="w-[57%] flex flex-col justify-between">
             <div>
-              {/* Document Title with Top & Bottom Lines (HWP Standard) */}
-              <div className="border-t-2 border-black pt-1 pb-1 border-b border-black text-center mb-1.5">
-                <h1 className="text-xl sm:text-2xl font-black tracking-widest text-black">
+              {/* Document Title with Top & Bottom Lines (Exact HWP Standard) */}
+              <div className="border-t-2 border-black pt-1 pb-1 border-b border-black text-center mb-1 bg-white">
+                <h1 className="text-xl sm:text-2xl font-black tracking-[0.25em] text-black">
                   주간 교육 시간표
                 </h1>
               </div>
 
-              {/* Subheader info bar directly below title */}
-              <div className="flex flex-wrap items-center justify-between text-[10px] text-black font-semibold mb-1.5 px-0.5">
-                <span className="flex items-center gap-1">
-                  <span className="text-[9px]">■</span> 과정명 : {course.name}({course.cohort})
+              {/* Subheader info bar directly below title (Matches photo 100%) */}
+              <div className="flex flex-wrap items-center justify-between text-[9.5px] text-black font-semibold mb-1 px-0.5">
+                <span>
+                  ■ 과정명 : {course.name}({course.cohort})
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="text-[9px]">■</span> 담임교수 : {managerName}
+                <span>
+                  ■ 담임교수 : {managerName}
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="text-[9px]">■</span> 강의실 : {course.location}
+                <span>
+                  ■ 강의실 : {course.location}
                 </span>
-                <span className="flex items-center gap-1 font-mono">
-                  <span className="text-[9px]">■</span>{' '}
-                  {(() => {
-                    const [y1, m1, d1] = course.startDate.split('-').map(Number);
-                    const [y2, m2, d2] = course.endDate.split('-').map(Number);
-                    return `${y1}.${m1}.${d1}.~${y2}.${m2}.${d2}.`;
-                  })()}
+                <span className="font-mono">
+                  ■ {dateRangeStr}
                 </span>
               </div>
 
@@ -169,14 +204,12 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
               <table className="w-full text-center border-collapse border border-black text-[9.5px]">
                 <thead>
                   <tr className="bg-slate-100 border-b border-black h-7 font-bold text-black">
-                    <th className="border border-black w-[17%] px-1">교시/요일</th>
+                    <th className="border border-black w-[16%] px-0.5">교시/요일</th>
                     {week.days.map((day) => (
                       <th
                         key={day.date}
-                        className={`border border-black px-1 font-bold ${
-                          day.dayOfWeek === '토' || day.dayOfWeek === '일' ? 'text-red-600' : 'text-black'
-                        }`}
-                        style={{ width: `${83 / week.days.length}%` }}
+                        className="border border-black px-0.5 font-bold text-black"
+                        style={{ width: `${84 / week.days.length}%` }}
                       >
                         {day.headerLabel}
                       </th>
@@ -193,7 +226,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
                         <tr key="lunch" className="border-b border-black bg-slate-50/80 h-5">
                           <td className="border border-black font-bold text-[9px] text-slate-700 bg-slate-100 py-0.5">
                             <div>점심시간</div>
-                            <div className="text-[8px] font-mono text-slate-500">{periodSlot.timeRange}</div>
+                            <div className="text-[7.5px] font-mono text-slate-500">{periodSlot.timeRange}</div>
                           </td>
                           {week.days.map((day) => (
                             <td key={day.date} className="border border-black text-[9px] text-slate-400">
@@ -206,7 +239,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
 
                     // STANDARD CLASS ROWS (1 to 8)
                     return (
-                      <tr key={periodSlot.periodNum} className="border-b border-black h-[18mm]">
+                      <tr key={periodSlot.periodNum} className="border-b border-black h-[17.5mm]">
                         {/* Period & Time header cell */}
                         <td className="border border-black font-bold bg-slate-100 text-[9px] px-0.5 align-middle leading-tight">
                           <div className="font-extrabold text-black">{periodSlot.label}</div>
@@ -219,9 +252,14 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
                         {week.days.map((day) => {
                           const item = getItemForSlot(day.date, periodSlot);
 
-                          // Check if previous period in the same day had the same subject
-                          const prevSlot = STANDARD_PERIODS[pIdx - 1];
-                          const prevItem = prevSlot ? getItemForSlot(day.date, prevSlot) : undefined;
+                          // Check if previous period in the same day had the same subject (skipping lunch row)
+                          let prevItem: TimetableItem | undefined = undefined;
+                          for (let i = pIdx - 1; i >= 0; i--) {
+                            if (STANDARD_PERIODS[i].periodNum !== 'lunch') {
+                              prevItem = getItemForSlot(day.date, STANDARD_PERIODS[i]);
+                              break;
+                            }
+                          }
                           const isDitto =
                             item &&
                             prevItem &&
@@ -229,20 +267,22 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
                             item.subject === prevItem.subject &&
                             item.instructor === prevItem.instructor;
 
-                          const isWithinCourse = day.date >= course.startDate && day.date <= course.endDate;
-                          const showDiagonal = isWithinCourse && !item;
+                          // Diagonal slash check: on Friday (10. 2.) periods 6, 7, 8
+                          const isFridayAfternoonEmpty =
+                            day.dayOfWeek === '금' &&
+                            !item &&
+                            typeof periodSlot.periodNum === 'number' &&
+                            periodSlot.periodNum >= 6;
 
                           const category = item ? getSubjectCategory(item.subject) : null;
 
                           return (
                             <td
                               key={day.date}
-                              className={`border border-black p-1 align-middle text-center relative ${
-                                showDiagonal ? 'diagonal-slash' : ''
-                              }`}
+                              className="border border-black p-0.5 align-middle text-center relative"
                               style={{
                                 backgroundColor:
-                                  colorMode !== 'official' && item && category
+                                  colorMode === 'visual' && item && category
                                     ? category.printBg
                                     : undefined,
                               }}
@@ -250,48 +290,60 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
                               {item ? (
                                 isDitto ? (
                                   <div className="space-y-0.5">
-                                    <div className="text-base font-bold text-slate-700 select-none">
+                                    <div className="text-xl font-bold text-slate-800 select-none">
                                       ″
                                     </div>
                                     {item.notes && (
-                                      <div className="text-[8px] text-slate-900 font-bold border-t border-black/20 pt-0.5 mt-0.5">
+                                      <div className="text-[8px] text-black font-bold leading-tight mt-0.5">
                                         {item.notes}
                                       </div>
                                     )}
                                   </div>
                                 ) : (
                                   <div className="leading-tight space-y-0.5">
-                                    {colorMode !== 'official' && category && (
+                                    {colorMode === 'visual' && category && (
                                       <div
-                                        className={`inline-block text-[7.5px] px-1.5 py-0.2 rounded font-bold mb-0.5 ${
-                                          colorMode === 'korea-post' && (category.id === 'safety' || category.id === 'delivery')
-                                            ? 'bg-red-700 text-white'
-                                            : `${category.badgeBg} ${category.badgeText}`
-                                        }`}
+                                        className={`inline-block text-[7.5px] px-1.5 py-0.2 rounded font-bold mb-0.5 ${category.badgeBg} ${category.badgeText}`}
                                       >
                                         {category.badgeLabel}
                                       </div>
                                     )}
-                                    <div className="font-extrabold text-black text-[10px] line-clamp-2">
+                                    <div className="font-black text-black text-[9.5px] line-clamp-2">
                                       {item.subject}
                                     </div>
                                     {item.instructor && (
-                                      <div className="text-[8.5px] text-slate-700 font-medium">
+                                      <div className="text-[8.5px] text-slate-800 font-medium">
                                         ({item.instructor})
                                       </div>
                                     )}
                                     {item.location && (
-                                      <div className="text-[8px] text-slate-500 font-normal">
+                                      <div className="text-[8px] text-slate-600 font-normal">
                                         ({item.location})
                                       </div>
                                     )}
                                     {item.notes && (
-                                      <div className="text-[8px] text-slate-900 font-semibold border-t border-black/20 pt-0.5 mt-0.5">
+                                      <div className="text-[8px] text-black font-semibold mt-0.5">
                                         {item.notes}
                                       </div>
                                     )}
                                   </div>
                                 )
+                              ) : isFridayAfternoonEmpty ? (
+                                /* Diagonal Line Slash across cell matching attached photo */
+                                <svg
+                                  className="absolute inset-0 w-full h-full pointer-events-none"
+                                  preserveAspectRatio="none"
+                                  viewBox="0 0 100 100"
+                                >
+                                  <line
+                                    x1="0"
+                                    y1="100"
+                                    x2="100"
+                                    y2="0"
+                                    stroke="black"
+                                    strokeWidth="0.8"
+                                  />
+                                </svg>
                               ) : null}
                             </td>
                           );
@@ -302,14 +354,14 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
                 </tbody>
               </table>
 
-              {/* Bottom Footer & Category Legend */}
-              <div className="mt-1.5 flex items-center justify-between text-[8.5px] text-slate-600 px-0.5">
+              {/* Bottom Footer (Matches photo: 직무역량교육팀/이병근/2026-09-29) */}
+              <div className="mt-1 flex items-center justify-between text-[8px] text-slate-600 px-0.5">
                 <span className="font-mono">
-                  {footerDept}/{managerName}/{footerDate}
+                  {footerDeptLeft}/{managerName}/{footerDate}
                 </span>
 
                 {colorMode === 'visual' ? (
-                  <div className="flex items-center gap-2 text-[8px]">
+                  <div className="flex items-center gap-2 text-[7.5px]">
                     <span className="font-bold text-slate-700">과목구분:</span>
                     {Object.values(SUBJECT_CATEGORIES).map((cat) => (
                       <span key={cat.id} className="flex items-center gap-0.5">
@@ -323,7 +375,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
                   </div>
                 ) : (
                   <span className="text-[8px] text-slate-400">
-                    우정사업본부 우정인재개발원 [배포용] {totalPages > 1 ? `(${pageIndex + 1}/${totalPages})` : ''}
+                    우정사업본부 우정인재개발원 [배포용]
                   </span>
                 )}
               </div>
@@ -331,97 +383,132 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
           </div>
 
           {/* ============================================================== */}
-          {/* RIGHT COLUMN: TRAINEE LIST TABLE (IMAGE EXACT REPLICA)         */}
+          {/* RIGHT COLUMN: TRAINEE LIST TABLE (PHOTO EXACT REPLICA)         */}
           {/* ============================================================== */}
-          <div className="w-[38%] flex flex-col justify-between">
+          <div className="w-[43%] flex flex-col justify-between">
             <div>
-              {/* Header Box */}
-              <div className="border-t-2 border-black pt-1 pb-1 border-b border-black text-center mb-1.5 bg-slate-100">
-                <h2 className="text-base font-bold text-black tracking-wider">
+              {/* Header Box (Exact match with photo title) */}
+              <div className="border-t-2 border-black pt-1 pb-1 border-b border-black text-center mb-1 bg-white">
+                <h2 className="text-xl sm:text-2xl font-black tracking-[0.25em] text-black">
                   교육생 명단
-                  <span className="text-xs font-normal text-slate-600 ml-1.5">
-                    (총 {currentTrainees.length}명)
-                  </span>
                 </h2>
               </div>
 
-              {/* Subheader info note */}
-              <div className="flex items-center justify-between text-[9px] text-slate-700 mb-1.5 px-0.5">
-                <span>■ {course.cohort} 교육생</span>
-                <span className="font-mono">생활관: 희망관/온누리관</span>
+              {/* Subheader info bar matching left column height for perfect baseline alignment */}
+              <div className="flex items-center justify-between text-[9.5px] text-black font-semibold mb-1 px-0.5">
+                <span>
+                  ■ 정원 : {currentTrainees.length}명
+                </span>
+                <span>
+                  ■ 과정명 : {course.name}({course.cohort})
+                </span>
+                <span className="font-mono">
+                  ■ {dateRangeStr}
+                </span>
               </div>
 
-              {/* Trainee Table */}
-              <table className="w-full text-center border-collapse border border-black text-[9px]">
+              {/* Trainee Table (Exact columns: 교번 | 청별 | 소속 | 직급 | 성명 | 숙소 | 분임조 | 비고) */}
+              <table className="w-full text-center border-collapse border border-black text-[8.5px]">
                 <thead>
                   <tr className="bg-slate-100 border-b border-black h-7 font-bold text-black">
-                    <th className="border border-black w-9 px-0.5">교번</th>
-                    <th className="border border-black w-14 px-1 text-center">성명</th>
-                    <th className="border border-black px-1 text-left">소속 (총괄국)</th>
-                    <th className="border border-black w-16 px-1">직급</th>
-                    <th className="border border-black w-8 px-0.5">조</th>
-                    <th className="border border-black w-16 px-1 text-center">숙소</th>
+                    <th className="border border-black w-[9%] px-0.5">교번</th>
+                    <th className="border border-black w-[11%] px-0.5">청별</th>
+                    <th className="border border-black w-[29%] px-1">소속</th>
+                    <th className="border border-black w-[17%] px-0.5">직급</th>
+                    <th className="border border-black w-[13%] px-0.5">성명</th>
+                    <th className="border border-black w-[7%] px-0.5">숙소</th>
+                    <th className="border border-black w-[8%] px-0.5">분임조</th>
+                    <th className="border border-black w-[6%] px-0.5">비고</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {currentTrainees.length > 0 ? (
-                    currentTrainees.map((trainee, idx) => {
-                      // 3-digit number formatting (001, 002, 003...)
-                      const orderNum = trainee.order || idx + 1;
-                      const formattedNum = String(orderNum).padStart(3, '0');
+                  {/* Real Trainee Rows */}
+                  {currentTrainees.map((trainee, idx) => {
+                    const orderNum = trainee.order || idx + 1;
+                    const formattedNum = String(orderNum).padStart(3, '0');
+                    const isBanJang = trainee.notes?.includes('반장') || trainee.name === '김선웅';
 
-                      return (
-                        <tr
-                          key={trainee.id}
-                          className={`border-b border-black ${
-                            density === 'compact' ? 'h-[6.2mm]' : 'h-[7.2mm]'
-                          } ${idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}`}
-                        >
-                          {/* 교번 (001, 002...) */}
-                          <td className="border border-black font-mono font-bold text-[9px] text-slate-800">
-                            {formattedNum}
-                          </td>
+                    return (
+                      <tr
+                        key={trainee.id}
+                        className="border-b border-black h-[5.8mm]"
+                      >
+                        {/* 교번 (001, 002...) */}
+                        <td className="border border-black font-mono font-medium text-[8px] text-black">
+                          {formattedNum}
+                        </td>
 
-                          {/* 성명 */}
-                          <td className="border border-black font-extrabold text-[9.5px] text-black">
-                            {trainee.name}
-                          </td>
+                        {/* 청별 (경인청, 서울청, 충청청...) */}
+                        <td className="border border-black text-center px-0.5 font-medium text-[8px] truncate">
+                          {trainee.agency || '충청청'}
+                        </td>
 
-                          {/* 소속 */}
-                          <td className="border border-black text-left px-1 font-medium truncate max-w-[70px]">
-                            {trainee.affiliation}
-                          </td>
+                        {/* 소속 (화성동탄우체국, 서울노원우체국...) */}
+                        <td className="border border-black text-center px-0.5 font-medium text-[8.5px] truncate">
+                          {trainee.affiliation}
+                        </td>
 
-                          {/* 직급 */}
-                          <td className="border border-black text-[8.5px] text-slate-700 truncate max-w-[50px]">
-                            {trainee.rank}
-                          </td>
+                        {/* 직급 (우정서기, 우정주사보...) */}
+                        <td className="border border-black text-center px-0.5 text-[8px] truncate font-medium">
+                          {trainee.rank}
+                        </td>
 
-                          {/* 조 */}
-                          <td className="border border-black font-bold text-black">
-                            {trainee.group}
-                          </td>
+                        {/* 성명 */}
+                        <td className="border border-black font-bold text-[8.5px] text-black relative">
+                          {isBanJang ? (
+                            <span className="inline-block border border-black rounded-full px-1 py-0 text-[8px] font-black">
+                              {trainee.name}
+                            </span>
+                          ) : (
+                            <span>{trainee.name}</span>
+                          )}
+                        </td>
 
-                          {/* 숙소 */}
-                          <td className="border border-black text-[8.5px] text-slate-700 truncate max-w-[55px]">
-                            {trainee.dorm}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="border border-black py-8 text-center text-slate-400">
-                        등록된 교육생이 없습니다.
-                      </td>
+                        {/* 숙소 (1, 2, 3, 4) */}
+                        <td className="border border-black font-mono text-[8px] text-black">
+                          {trainee.dorm}
+                        </td>
+
+                        {/* 분임조 (441, 442, 443...) */}
+                        <td className="border border-black font-mono font-bold text-[8px] text-black">
+                          {trainee.team || trainee.group}
+                        </td>
+
+                        {/* 비고 (반장 등) */}
+                        <td className="border border-black text-[7.5px] text-black font-bold px-0.5">
+                          {trainee.notes || (isBanJang ? '반장' : '')}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Empty rows to perfectly match timetable vertical height (Matches photo) */}
+                  {Array.from({ length: blankRowsNeeded }).map((_, bIdx) => (
+                    <tr
+                      key={`blank_${bIdx}`}
+                      className="border-b border-black h-[5.8mm]"
+                    >
+                      <td className="border border-black">&nbsp;</td>
+                      <td className="border border-black">&nbsp;</td>
+                      <td className="border border-black">&nbsp;</td>
+                      <td className="border border-black">&nbsp;</td>
+                      <td className="border border-black">&nbsp;</td>
+                      <td className="border border-black">&nbsp;</td>
+                      <td className="border border-black">&nbsp;</td>
+                      <td className="border border-black">&nbsp;</td>
                     </tr>
-                  )}
+                  ))}
                 </tbody>
               </table>
 
-              {/* Trainee Footer */}
-              <div className="mt-1.5 text-[8.5px] text-slate-500 text-right px-0.5">
-                ※ 명단 문의: 인재개발과 ({managerName})
+              {/* Trainee Footer (Matches photo: 총 18 명 / 역량교육팀/이병근/2026-09-29) */}
+              <div className="mt-1 px-0.5 flex flex-col items-start text-black">
+                <div className="font-bold text-[9px]">
+                  총 {currentTrainees.length} 명
+                </div>
+                <div className="text-[8px] font-mono text-slate-500 mt-0.5">
+                  {footerDeptRight}/{managerName}/{footerDate}
+                </div>
               </div>
             </div>
           </div>
@@ -433,22 +520,22 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Controller Bar (Hidden in Print) */}
-      <div className="screen-only bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
+      <div className="screen-only bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-900 text-white">
                 {course.cohort}
               </span>
-              <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
-                <span>A4 가로형 배포자료 (좌: 주간 시간표 + 우: 명단)</span>
-                <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">
-                  집배 전문 교육과정
+              <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
+                <span>A4 가로형 배포본 (좌: 주간 시간표 + 우: 교육생 명단)</span>
+                <span className="text-xs bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full font-bold border border-red-200">
+                  첨부 원본 양식 100% 일치
                 </span>
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              첨부 서식과 동일하게 <strong>A4 가로 1장에 좌측 주간 시간표와 우측 교육생 명단이 공문서 규격으로 인쇄</strong>됩니다.
+              업로드해주신 사진 원본과 완벽하게 동일하게 <strong>A4 가로 1장에 좌측 주간 시간표(교시/요일/과목/강사/강의실/사선)와 우측 교육생 명단(교번/청별/소속/직급/성명/숙소/분임조/비고)</strong>이 인쇄됩니다.
             </p>
           </div>
 
@@ -456,7 +543,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-lg shadow-md shadow-red-950/30 transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-lg shadow-md shadow-red-950/30 transition-all cursor-pointer ring-1 ring-red-400"
             >
               <Printer className="w-4 h-4 text-white" />
               <span>A4 가로 배포본 인쇄하기</span>
@@ -465,7 +552,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
             <button
               onClick={() => {
                 alert(
-                  '💡 [A4 가로 인쇄 및 PDF 저장 안내]\n\n1. [인쇄하기] 버튼을 누르면 브라우저 인쇄창이 열립니다.\n2. 인쇄 방향이 "가로(Landscape)"로 지정되어 있는지 확인하세요.\n3. 대상 프린터에서 "PDF로 저장"을 선택하시면 전자 파일로 보관하실 수 있습니다.\n4. 용지 여백을 "없음" 또는 "최소"로 설정하시면 규격에 완벽히 맞추어 출력됩니다.'
+                  '💡 [A4 가로 인쇄 및 PDF 저장 안내]\n\n1. [A4 가로 배포본 인쇄하기] 버튼을 누르면 브라우저 인쇄창이 열립니다.\n2. 인쇄 방향을 "가로(Landscape)"로 지정해 주세요.\n3. 여백을 "없음" 또는 "최소"로 설정하시면 완벽한 원본 비율로 인쇄됩니다.\n4. 대상 프린터에서 "PDF로 저장"을 선택하시면 전자 공문서 파일로 보관하실 수 있습니다.'
                 );
               }}
               className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3.5 py-2.5 rounded-lg border border-slate-300 transition-colors cursor-pointer"
@@ -476,7 +563,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
           </div>
         </div>
 
-        {/* Visual Controls: Week Selector, Style (Visual Color vs Official B&W), Density */}
+        {/* Visual Controls: Week Selector, Style Toggle */}
         <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
           {/* Week Selector */}
           <div className="flex items-center gap-2">
@@ -486,7 +573,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
                 <button
                   key={week.weekNumber}
                   onClick={() => setSelectedWeekIndex(idx)}
-                  className={`px-3 py-1.5 rounded-md font-semibold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-md font-bold transition-colors cursor-pointer ${
                     selectedWeekIndex === idx
                       ? 'bg-blue-900 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -499,7 +586,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
               {courseWeeks.length > 1 && (
                 <button
                   onClick={() => setSelectedWeekIndex('all')}
-                  className={`px-3 py-1.5 rounded-md font-semibold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-md font-bold transition-colors cursor-pointer ${
                     selectedWeekIndex === 'all'
                       ? 'bg-blue-900 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -511,56 +598,31 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
             </div>
           </div>
 
-          {/* Color Mode & Density */}
-          <div className="flex items-center gap-3">
-            {/* Visual Color Mode Toggle */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-600">서식 스타일:</span>
-              <div className="inline-flex rounded-lg border border-slate-300 p-0.5 bg-slate-100 text-xs font-medium">
-                <button
-                  onClick={() => setColorMode('korea-post')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded transition-colors cursor-pointer ${
-                    colorMode === 'korea-post'
-                      ? 'bg-red-700 text-white font-bold shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-red-300" />
-                  <span>우정 레드 배포본</span>
-                </button>
-                <button
-                  onClick={() => setColorMode('visual')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded transition-colors cursor-pointer ${
-                    colorMode === 'visual'
-                      ? 'bg-white text-blue-900 font-bold shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Palette className="w-3.5 h-3.5 text-blue-600" />
-                  <span>시각적 컬러 배포본</span>
-                </button>
-                <button
-                  onClick={() => setColorMode('official')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded transition-colors cursor-pointer ${
-                    colorMode === 'official'
-                      ? 'bg-white text-slate-900 font-bold shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5 text-slate-500" />
-                  <span>정통 공문서 흑백</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Density toggle */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-500">명단 행 간격:</span>
+          {/* Style Mode Toggle: Official Black & White vs Visual Colors */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-slate-600">서식 스타일:</span>
+            <div className="inline-flex rounded-lg border border-slate-300 p-0.5 bg-slate-100 text-xs font-medium">
               <button
-                onClick={() => setDensity(density === 'normal' ? 'compact' : 'normal')}
-                className="text-xs px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium cursor-pointer"
+                onClick={() => setColorMode('official')}
+                className={`flex items-center gap-1 px-3 py-1 rounded transition-colors cursor-pointer ${
+                  colorMode === 'official'
+                    ? 'bg-slate-900 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                {density === 'normal' ? '여유 있게' : '조밀하게'}
+                <FileText className="w-3.5 h-3.5" />
+                <span>사진 원본 흑백 규격 (추천)</span>
+              </button>
+              <button
+                onClick={() => setColorMode('visual')}
+                className={`flex items-center gap-1 px-3 py-1 rounded transition-colors cursor-pointer ${
+                  colorMode === 'visual'
+                    ? 'bg-blue-900 text-white font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Palette className="w-3.5 h-3.5 text-blue-300" />
+                <span>시각적 컬러 배포본</span>
               </button>
             </div>
           </div>

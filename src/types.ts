@@ -14,14 +14,16 @@ export interface Course {
 export interface Trainee {
   id: string;
   courseId: string;
-  order: number; // 번호 (1, 2, 3...)
-  affiliation: string; // 소속 (e.g. "서울강남우체국")
-  rank: string; // 직급 (e.g. "행정서기보(시보)", "집배서기보")
-  name: string; // 이름
-  gender?: string; // 성별 (e.g. "남", "여")
-  group: string; // 조 (e.g. "1조", "2조")
-  dorm: string; // 숙소 (e.g. "희망관 301호", "비생활")
-  notes?: string; // 비고
+  order: number; // 교번 (1, 2, 3...)
+  agency?: string; // 청별 (경인청, 서울청, 충청청, 전북청, 부산청, 전남청 등)
+  affiliation: string; // 소속 (화성동탄우체국, 서울노원우체국 등)
+  rank: string; // 직급 (우정서기, 우정주사보, 행정주사보 등)
+  name: string; // 성명
+  gender?: string; // 성별
+  dorm: string; // 숙소 (1, 2, 3, 4 등)
+  team?: string; // 분임조 (441, 442, 443 등)
+  group: string; // 조
+  notes?: string; // 비고 (반장 등)
 }
 
 export interface TimetableItem {

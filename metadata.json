@@ -2,5 +2,7 @@
   "name": "우정사업본부 집배원 교육관리 시스템",
   "description": "우정사업본부 집배원 교육담당자를 위한 교육생 명단 및 시간표 자동 작성, 엑셀 연동, A4 공문서 출력 관리도구",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
