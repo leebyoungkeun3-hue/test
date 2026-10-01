@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", helvetica, sans-serif;
+  }
+}
+
+/* Print specific rules for Korean official document standards (HWP / 공문서 스타일) */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm 8mm 8mm 8mm;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-size: 9pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .screen-only {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-page-break {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Table repetitions on multi-page print */
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
+/* Diagonal slash for empty timetable periods (HWP style) */
+.diagonal-slash {
+  background: linear-gradient(to top right, transparent calc(50% - 0.5px), #111111 calc(50% - 0.5px), #111111 calc(50% + 0.5px), transparent calc(50% + 0.5px));
+}
+
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
